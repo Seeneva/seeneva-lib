@@ -1,5 +1,9 @@
 #https://github.com/rust-lang/rust/blob/master/config.toml.example
 
+[net]
+# Required to checkout some git submodules like `xz`submodule. Check `lzma-sys` crate.
+git-fetch-with-cli = true
+
 [target.'cfg(target_os="android")']
 runner = ["./scripts/android_runner.sh"]
 rustflags = [
