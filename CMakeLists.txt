@@ -32,6 +32,12 @@ macro(list_to_spaced_string varName)
     string(REPLACE ";" " " ${varName} "${${varName}}")
 endmacro()
 
+find_program(CARGO cargo)
+
+if(NOT CARGO)
+    message(FATAL_ERROR "Can't find Rust Cargo path")
+endif()
+
 if(ANDROID_ABI STREQUAL armeabi-v7a)
     set(CLANG_TRIPPLE armv7a-linux-androideabi)
     set(RUST_TARGET_TRIPPLE armv7-linux-androideabi)
@@ -62,7 +68,7 @@ string(REPLACE "-" "_" CARGO_TARGET_TRIPPLE ${RUST_TARGET_TRIPPLE})
 string(TOUPPER ${CARGO_TARGET_TRIPPLE} CARGO_TARGET_TRIPPLE)
 
 # Cargo command
-set(CARGO_COMMAND cargo build --target=${RUST_TARGET_TRIPPLE} --features \"${RUST_BUILD_FEATURES}\")
+set(CARGO_COMMAND ${CARGO} build --target=${RUST_TARGET_TRIPPLE} --features \"${RUST_BUILD_FEATURES}\")
 
 # C/CXX flags
 set(C_FLAGS ${CMAKE_C_FLAGS} ${CMAKE_SHARED_LIBRARY_C_FLAGS})
@@ -149,7 +155,7 @@ cp ./target/${RUST_TARGET_TRIPPLE}/${RustBuildType}/*.so ${CMAKE_LIBRARY_OUTPUT_
     file(WRITE ${CARGO_BUILD_SCRIPT} ${CARGO_BUILD_SCRIPT_CONTENT})
 
     file(
-        COPY ${CARGO_BUILD_SCRIPT} 
+        COPY ${CARGO_BUILD_SCRIPT}
         DESTINATION ${CMAKE_BINARY_DIR}
         NO_SOURCE_PERMISSIONS
         FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
