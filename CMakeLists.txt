@@ -32,7 +32,7 @@ macro(list_to_spaced_string varName)
     string(REPLACE ";" " " ${varName} "${${varName}}")
 endmacro()
 
-find_program(CARGO cargo)
+find_program(CARGO cargo PATHS $ENV{HOME}/.cargo/bin)
 
 if(NOT CARGO)
     message(FATAL_ERROR "Can't find Rust Cargo path")
