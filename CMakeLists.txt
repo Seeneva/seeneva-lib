@@ -24,6 +24,7 @@ cmake_minimum_required(VERSION 3.10.2)
 
 option(RUST_RELEASE "Specify cargo release build type" OFF)
 option(RUST_DEBUG_LOGS "Library should show debug logs" ON)
+option(LIB_DEB_SYMBOLS "The output library should contains debug symbols" ON)
 
 # Check '${NDK}/build/cmake/android.toolchain.cmake' for variables
 # Also https://cmake.org/cmake/help/latest/manual/cmake-toolchains.7.html#id21
@@ -44,6 +45,13 @@ if(ANDROID_ABI STREQUAL armeabi-v7a)
 else()
     set(CLANG_TRIPPLE ${CMAKE_LIBRARY_ARCHITECTURE})
     set(RUST_TARGET_TRIPPLE ${CMAKE_LIBRARY_ARCHITECTURE})
+endif()
+
+if(ANDROID_NATIVE_API_LEVEL LESS 21)
+    # android_support should be linked to prevent *locale undefinde symbols
+    # needed by Tesseract
+    # You do not need it if your Android API level is >= 21
+    set(RUST_FLAGS "-C link-arg=-landroid_support")
 endif()
 
 if(NOT DEFINED RUST_TARGET_TRIPPLE)
@@ -74,6 +82,27 @@ set(CARGO_COMMAND ${CARGO} build --target=${RUST_TARGET_TRIPPLE} --features \"${
 set(C_FLAGS ${CMAKE_C_FLAGS} ${CMAKE_SHARED_LIBRARY_C_FLAGS})
 set(CXX_FLAGS ${CMAKE_CXX_FLAGS} ${CMAKE_SHARED_LIBRARY_CXX_FLAGS})
 
+if(LIB_DEB_SYMBOLS)
+    # rustflags = [
+    # # Add build-id to help LLDB find debug symbols for result stripped .so file using `$lldb settings append target.exec-search-paths`
+    # "-C", "link-arg=-Wl,--build-id=sha1",
+    # # This will pass `-g` to Rust compiler. This will prevent debug symbols from strip.
+    # # So you can use output .so as debug symbols source during debug even release builds
+    # # By default Android Studio strip debug symbols from all libraries before pack them into .apk, so you do not need to think about app size.
+    # "-C", "debuginfo=2"
+    # ]
+    list(APPEND RUST_FLAGS "-C link-arg=-Wl,--build-id=sha1" "-C debuginfo=2")
+else()
+    list(APPEND RUST_FLAGS "-C debuginfo=0")
+
+    # Remove -g C/CXX flag
+    set(_pattern "-g ?")
+
+    string(REGEX REPLACE ${_pattern} "" C_FLAGS ${C_FLAGS})
+    string(REGEX REPLACE ${_pattern} "" CXX_FLAGS ${CXX_FLAGS})
+endif()
+
+
 if(RUST_RELEASE)
     set(RustBuildType release)
     list(APPEND CARGO_COMMAND --release)
@@ -84,6 +113,7 @@ else()
 endif()
 
 list_to_spaced_string(CARGO_COMMAND)
+list_to_spaced_string(RUST_FLAGS)
 list_to_spaced_string(C_FLAGS)
 list_to_spaced_string(CXX_FLAGS)
 
@@ -120,6 +150,10 @@ export LLVM_CONFIG_PATH=\"${ANDROID_TOOLCHAIN_ROOT}/bin/llvm-config\"
 
 export CARGO_TARGET_${CARGO_TARGET_TRIPPLE}_LINKER=\"${CXX}\"
 export CARGO_TARGET_${CARGO_TARGET_TRIPPLE}_AR=\"${CMAKE_AR}\"
+
+# This will override your rustflags value in a .cargo/config file
+
+export RUSTFLAGS=\"${RUST_FLAGS}\"
 
 # C/CXX flags
 
