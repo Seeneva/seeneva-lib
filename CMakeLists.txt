@@ -76,7 +76,7 @@ string(REPLACE "-" "_" CARGO_TARGET_TRIPPLE ${RUST_TARGET_TRIPPLE})
 string(TOUPPER ${CARGO_TARGET_TRIPPLE} CARGO_TARGET_TRIPPLE)
 
 # Cargo command
-set(CARGO_COMMAND ${CARGO} build --target=${RUST_TARGET_TRIPPLE} --features \"${RUST_BUILD_FEATURES}\")
+list(APPEND CARGO_COMMAND ${CARGO} build --target=${RUST_TARGET_TRIPPLE} --features "${RUST_BUILD_FEATURES}")
 
 # C/CXX flags
 set(C_FLAGS ${CMAKE_C_FLAGS} ${CMAKE_SHARED_LIBRARY_C_FLAGS})
@@ -112,7 +112,6 @@ else()
     set(RustBuildType debug)
 endif()
 
-list_to_spaced_string(CARGO_COMMAND)
 list_to_spaced_string(RUST_FLAGS)
 list_to_spaced_string(C_FLAGS)
 list_to_spaced_string(CXX_FLAGS)
@@ -121,82 +120,52 @@ list_to_spaced_string(CXX_FLAGS)
 set(CC "${ANDROID_TOOLCHAIN_ROOT}/bin/${CLANG_TRIPPLE}${ANDROID_NATIVE_API_LEVEL}-clang")
 set(CXX "${CC}++")
 
-function(create_script)
-    set(TMP_DIR tmp)
-    set(CARGO_BUILD_SCRIPT "${TMP_DIR}/cargo_build.sh")
-
-    file(MAKE_DIRECTORY ${TMP_DIR})
-
-    # Script will be placed into {ANDROID_MODULE}/.cxx/cmake/{ANDROID_VARIANT}/{ANDROID_ABI_NAME}/
-
-    set(CARGO_BUILD_SCRIPT_CONTENT
-"#!/bin/sh
-
 # Set required env variables
+list(APPEND CARGO_ENVS
+    # Set libc linker and ar
+    # You can also set specific flags by CXX_${abi.rustTriple} (CXX_i686-linux-android)
+    # https://github.com/alexcrichton/cc-rs#external-configuration-via-environment-variables
+    "CC=${CC}"
+    "CXX=${CXX}"
+    "AR=${CMAKE_AR}"
+    "LD=${CMAKE_LINKER}"
+    "STRIP=${CMAKE_STRIP}"
+    "LLVM_CONFIG_PATH=${ANDROID_TOOLCHAIN_ROOT}/bin/llvm-config"
+    # Setup cargo. It can be overrided via .cargo/config TOML file
+    # https://doc.rust-lang.org/cargo/reference/config.html
+    "CARGO_TARGET_${CARGO_TARGET_TRIPPLE}_LINKER=${CXX}"
+    "CARGO_TARGET_${CARGO_TARGET_TRIPPLE}_AR=${CMAKE_AR}"
+    # This will override your rustflags value in a .cargo/config file
+    "RUSTFLAGS=${RUST_FLAGS}"
+    # C/CXX flags
+    "CFLAGS=${C_FLAGS}"
+    "CXXFLAGS=${CXX_FLAGS}"
+    "LDFLAGS=${CMAKE_SHARED_LINKER_FLAGS}"
+    # Passed to cc crate. Needed for Android. Without it cc crate will use c++_shared by default
+    # https://github.com/alexcrichton/cc-rs#c-support
+    "CXXSTDLIB=${ANDROID_STL}"
+    # CMAKE arguments
+    # https://developer.android.com/ndk/guides/cmake#usage
+    "CMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}"
+    "ANDROID_ABI=${ANDROID_ABI}"
+    "ANDROID_NATIVE_API_LEVEL=${ANDROID_NATIVE_API_LEVEL}"
+)
 
-# Set libc linker and ar
-# You can also set specific flags by CXX_${abi.rustTriple} (CXX_i686-linux-android)
-# https://github.com/alexcrichton/cc-rs#external-configuration-via-environment-variables
+add_custom_target(
+    cargo-build
+    COMMENT "Run Rust Cargo build for Seeneva native library"
+    WORKING_DIRECTORY ${CMAKE_HOME_DIRECTORY}
+    VERBATIM
+    USES_TERMINAL
+    COMMAND ${CMAKE_COMMAND} -E env ${CARGO_ENVS} ${CARGO_COMMAND}
+)
 
-export CC=\"${CC}\"
-export CXX=\"${CXX}\"
-export AR=\"${CMAKE_AR}\"
-export LD=\"${CMAKE_LINKER}\"
-export STRIP=\"${CMAKE_STRIP}\"
-export LLVM_CONFIG_PATH=\"${ANDROID_TOOLCHAIN_ROOT}/bin/llvm-config\"
-
-# Setup cargo. It can be overrided via .cargo/config TOML file
-# https://doc.rust-lang.org/cargo/reference/config.html
-
-export CARGO_TARGET_${CARGO_TARGET_TRIPPLE}_LINKER=\"${CXX}\"
-export CARGO_TARGET_${CARGO_TARGET_TRIPPLE}_AR=\"${CMAKE_AR}\"
-
-# This will override your rustflags value in a .cargo/config file
-
-export RUSTFLAGS=\"${RUST_FLAGS}\"
-
-# C/CXX flags
-
-export CFLAGS=\"${C_FLAGS}\"
-export CXXFLAGS=\"${CXX_FLAGS}\"
-export LDFLAGS=\"${CMAKE_SHARED_LINKER_FLAGS}\"
-# Passed to cc crate. Needed for Android. Without it cc crate will use c++_shared by default
-# https://github.com/alexcrichton/cc-rs#c-support
-export CXXSTDLIB=\"${ANDROID_STL}\"
-
-# CMAKE arguments
-# https://developer.android.com/ndk/guides/cmake#usage
-
-export CMAKE_TOOLCHAIN_FILE=\"${CMAKE_TOOLCHAIN_FILE}\"
-export ANDROID_ABI=\"${ANDROID_ABI}\"
-export ANDROID_NATIVE_API_LEVEL=\"${ANDROID_NATIVE_API_LEVEL}\"
-
-echo 'Run cargo build for ${ANDROID_ABI}'
-
-cd ${CMAKE_HOME_DIRECTORY} && \\
-${CARGO_COMMAND}"
-    )
-
-    if(CMAKE_LIBRARY_OUTPUT_DIRECTORY)
-        set(CARGO_BUILD_SCRIPT_CONTENT
-"${CARGO_BUILD_SCRIPT_CONTENT} && \\
-mkdir -p ${CMAKE_LIBRARY_OUTPUT_DIRECTORY} && \\
-# Copy shared libraries into output directory
-cp ./target/${RUST_TARGET_TRIPPLE}/${RustBuildType}/*.so ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
-        )
-    endif()
-
-    file(WRITE ${CARGO_BUILD_SCRIPT} ${CARGO_BUILD_SCRIPT_CONTENT})
-
-    file(
-        COPY ${CARGO_BUILD_SCRIPT}
-        DESTINATION ${CMAKE_BINARY_DIR}
-        NO_SOURCE_PERMISSIONS
-        FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-    )
-
-
-    file(REMOVE_RECURSE ${TMP_DIR})
-endfunction()
-
-create_script()
+add_custom_command(
+    TARGET cargo-build POST_BUILD
+    WORKING_DIRECTORY "${CMAKE_HOME_DIRECTORY}"
+    COMMENT "Copy shared libraries into output directory"
+    # Make output directory if it doesn't exist
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
+    # Copy builded shared libraries
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "./target/${RUST_TARGET_TRIPPLE}/${RustBuildType}/*.so" "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
+)

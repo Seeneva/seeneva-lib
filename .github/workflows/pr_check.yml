@@ -1,0 +1,129 @@
+name: Check PR
+
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  filter_paths:
+    name: Filter changed paths
+    runs-on: ubuntu-latest
+    outputs:
+      src_changed: ${{ steps.check_files.outputs.src_files }}
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: dorny/paths-filter@v2.10.1
+        id: check_files
+        with:
+          filters: |
+            src_files:
+              - '.cargo/**'
+              - '.github/workflows/*.yml'
+              - '.github/rust-toolchain-*.toml'
+              - '.github/*.sh'
+              - 'src/**'
+              - 'test/**'
+              - 'Cargo.*'
+              - 'CMakeLists.txt'
+
+  fetch_crates:
+    name: Prefetch Cargo crates
+    runs-on: ubuntu-latest
+    if: ${{ needs.filter_paths.outputs.src_changed == 'true' }}
+    needs: filter_paths
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Copy rust-toolchain file
+        run: |
+          cp ./.github/rust-toolchain-android.toml ./rust-toolchain
+
+      - name: Cache Cargo crates registry
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('Cargo.lock', 'rust-toolchain') }}
+
+      - name: Run Cargo fetch
+        run: cargo fetch
+
+  test:
+    name: PR test Rust code
+    runs-on: ubuntu-latest
+    needs: fetch_crates
+    steps:
+      - name: Install packages
+        run: sudo apt install autopoint libleptonica-dev
+
+      - uses: actions/checkout@v2
+
+      - name: Copy rust-toolchain file
+        run: |
+          cp ./.github/rust-toolchain-android.toml ./rust-toolchain
+
+      - name: Cache Cargo crates registry
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('Cargo.lock', 'rust-toolchain') }}
+
+      - name: Cache Cargo target
+        uses: actions/cache@v2
+        with:
+          path: |
+            ./native/target
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('Cargo.lock', 'rust-toolchain') }}
+
+      - name: Run Rust tests
+        run: cargo test
+
+  build:
+    name: PR build Android shared libraries
+    runs-on: ubuntu-latest
+    needs: fetch_crates
+    strategy:
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a, x86, x86_64]
+    env:
+      NDK_VERSION: 21.4.7075529
+      CMAKE_VERSION: 3.10.2.4988404
+      ABI: ${{ matrix.abi }}
+    steps:
+      - name: Install packages
+        run: sudo apt install autopoint
+
+      - uses: actions/checkout@v2
+
+      - name: Copy rust-toolchain file
+        run: |
+          cp ./.github/rust-toolchain-android.toml ./rust-toolchain
+
+      # Ensure that required packages are installed
+      - name: Prepare Android SDK
+        run: |
+          ${ANDROID_HOME}/tools/bin/sdkmanager --install "ndk;${NDK_VERSION}" "cmake;${CMAKE_VERSION}" --channel=0
+
+      - name: Cache Cargo crates registry
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('Cargo.lock', 'rust-toolchain') }}
+
+      - name: Cache Cargo target
+        uses: actions/cache@v2
+        with:
+          path: |
+            ./native/target
+          key: ${{ runner.os }}-cargo-android-${{ env.ABI }}-${{ hashFiles('Cargo.lock', 'rust-toolchain') }}
+
+      - name: Build CMake target
+        run: |
+          ./.github/run_cmake.sh

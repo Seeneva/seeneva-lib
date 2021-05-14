@@ -9,3 +9,6 @@ insert_final_newline = true
 [**/CMakeLists.txt]
 trim_trailing_whitespace = true
 insert_final_newline = true
+
+[{*.yml, *.yaml}]
+indent_size = 2
