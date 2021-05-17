@@ -148,11 +148,20 @@ impl Iterator for ArchiveComicIterator<'_> {
         loop {
             match self.archive.0.next_entry_into(entry).transpose()? {
                 Ok(_) => match build_comic_container_file(&mut self.archive.0, entry) {
-                    Err(Error::NotAFile(_)) => {
+                    Err(Error::NotAFile(t)) => {
                         //silently ignore any non file entries
+                        error!(
+                            "Archive entry {} is not a file. Entry type: {:?}",
+                            entry.path(),
+                            t
+                        );
                         continue;
                     }
                     result => {
+                        if let Some(e) = result.as_ref().err() {
+                            error!("Archive read file entry error: {:?}", e);
+                        }
+
                         return Some(result);
                     }
                 },
@@ -161,9 +170,11 @@ impl Iterator for ArchiveComicIterator<'_> {
                     _,
                 )) => {
                     // something really bad happened. It is better to return from the iterator
+                    error!("Archive fatal error");
                     return None;
                 }
                 Err(e) => {
+                    error!("Archive error at {}. {}", self.archive.0.current_pos(), e);
                     return Some(Err(e.into()));
                 }
             };
