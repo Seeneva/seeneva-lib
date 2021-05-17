@@ -197,6 +197,8 @@ where
                             b_boxes: vec![],
                         };
 
+                        debug!("Start YOLO processing comic book page '{}'. Size {}x{}", page.name, page.width, page.height);
+
                         let yolo_input_dims = self.interpreter.input_dims();
 
                         // prepare YOLO input image
