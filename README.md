@@ -4,9 +4,15 @@ Native part of [Seeneva](https://github.com/Seeneva/seeneva-reader-android) comi
 
 ## Build
 
+### Android
+
 Check [Seeneva](https://github.com/Seeneva/seeneva-reader-android) documentation to know more about the building process for Android targets.
 
-Also you can use Android [NDK](https://developer.android.com/ndk) and provided [CMakeLists.txt](CMakeLists.txt) to build output shared library without Gradle. Check Android [CMake](https://developer.android.com/ndk/guides/cmake.html#build-command) documentation to know more about it.  
+Also you can use Android [NDK](https://developer.android.com/ndk) and provided [CMakeLists.txt](CMakeLists.txt) to build output shared library without Gradle. Check Android [CMake](https://developer.android.com/ndk/guides/cmake.html#build-command) documentation to know more about it.
+
+### GitHub CI
+
+Ensure that [rust-toolchain-android.toml](.github/rust-toolchain-android.toml) has proper Rust toolchain and [pr_check.yml](.github/workflows/pr_check.yml) has proper `NDK_VERSION` and `CMAKE_VERSION` env variables.
 
 ## Formatting
 

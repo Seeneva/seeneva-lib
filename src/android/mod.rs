@@ -89,7 +89,7 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: JavaVM, _reserved: JObject) -> jint {
             } else {
                 log::Level::Info
             })
-            .with_tag("ComicsReaderNative");
+            .with_tag("SeenevaNative");
 
         android_logger::init_once(config);
     }
