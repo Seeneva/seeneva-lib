@@ -38,6 +38,6 @@ impl<E: ComicContainerError + 'static> From<E> for InitComicContainerError {
 
 ///Base trait for comic book containers errors
 pub trait ComicContainerError:
-    std::error::Error + thiserror::private::AsDynError + Send + Sync
+    std::error::Error + thiserror::private::AsDynError<'static> + Send + Sync
 {
 }
