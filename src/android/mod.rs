@@ -133,10 +133,10 @@ pub unsafe extern "C" fn JNI_OnLoad(vm: JavaVM, _reserved: JObject) -> jint {
 // pub unsafe extern "C" fn JNI_OnUnload(vm: JavaVM, _reserved: JObject) {
 // }
 
-///Cancel provided task [task]
-/// Return is task was cancelled
+///Cancel and close provided task [task]
+/// Return is task was closed
 #[no_mangle]
-pub unsafe extern "C" fn Java_app_seeneva_reader_data_source_jni_Native_00024Task_cancelNative(
+pub unsafe extern "C" fn Java_app_seeneva_reader_data_source_jni_Native_00024TaskHandler_closeNative(
     env: JNIEnv,
     task: JObject,
 ) -> jboolean {
@@ -145,7 +145,7 @@ pub unsafe extern "C" fn Java_app_seeneva_reader_data_source_jni_Native_00024Tas
     unwrap_result!(
         app_objects::task::cancel(&env, task),
         env,
-        "Can't cancel task",
+        "Can't cancel the task",
         0 as _
     );
 
