@@ -28,11 +28,11 @@ use crate::task::TaskHandler;
 use super::{constants, JniClassConstructorCache};
 
 static CONSTRUCTOR: Lazy<JniClassConstructorCache<&str, &str>> =
-    Lazy::new(|| (constants::TASK_TYPE, "()V").into());
+    Lazy::new(|| (constants::TASK_HANDLER_TYPE, "()V").into());
 
 pub type Task<'a> = JObject<'a>;
 
-const TASK_PTR_FIELD: &str = "id";
+const TASK_PTR_FIELD: &str = "ptr";
 
 /// wrap [TaskHandler] into JVM Task Class
 pub fn new<'a>(env: &'a JNIEnv, handler: TaskHandler) -> JniResult<Task<'a>> {
@@ -48,13 +48,13 @@ pub fn new<'a>(env: &'a JNIEnv, handler: TaskHandler) -> JniResult<Task<'a>> {
 /// Drop wrapped [TaskHandler] to cancel bounded task
 /// It will block thread until task is locked!
 pub fn cancel(env: &JNIEnv, task: Task) -> JniResult<()> {
-    debug!("Trying to cancel task: {:p}", task.into_inner());
+    debug!("Trying to cancel the task: {:p}", task.into_inner());
 
     // Now, while I do not borrow inner TaskHandler it shouldn't be locked
     // But I can do it in the future. So this block can be a problem...
 
     take_rust_field::<_, _, Mutex<TaskHandler>, _>(env, task, TASK_PTR_FIELD).map(|_| {
-        debug!("Task {:p} is cancelled", task.into_inner());
+        debug!("The task {:p} is cancelled", task.into_inner());
 
         ()
     })

@@ -50,7 +50,7 @@ pub mod Results {
     pub const COMIC_BOOK_TYPE: &str = "app/seeneva/reader/data/entity/ComicBook";
 }
 
-pub const TASK_TYPE: &str = "app/seeneva/reader/data/source/jni/Native$Task";
+pub const TASK_HANDLER_TYPE: &str = "app/seeneva/reader/data/source/jni/Native$TaskHandler";
 
 pub const JAVA_INTEGER_TYPE: &str = "java/lang/Integer";
 pub const JAVA_BOOLEAN_TYPE: &str = "java/lang/Boolean";
