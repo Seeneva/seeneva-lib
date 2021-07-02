@@ -16,7 +16,11 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-use std::io::{Read, Result as IoResult, Seek, SeekFrom};
+use std::convert::TryFrom;
+use std::{
+    convert::TryInto,
+    io::{Read, Result as IoResult, Seek, SeekFrom},
+};
 
 use once_cell::sync::Lazy;
 
@@ -37,8 +41,8 @@ pub enum MagicType {
 
 impl MagicType {
     const NUMBERS: [(&'static [u8], MagicType); 2] = [
-        (b"%PDF", MagicType::PDF),
-        (b"<?xml version=", MagicType::XML),
+        (b"%PDF", Self::PDF),
+        (b"<?xml version=", Self::XML),
         // (b"Rar!\x1A\x07\x00", MagicType::RAR),
         // (b"Rar!\x1A\x07\x01\x00", MagicType::RAR),
         // (b"PK", MagicType::ZIP),
@@ -50,15 +54,26 @@ impl MagicType {
     where
         T: Read + Seek,
     {
-        let mut buf = vec![0u8; *MAGIC_MAX_LEN];
+        let size = input.seek(SeekFrom::End(0))?;
 
-        let seek = SeekFrom::Start(0);
+        match usize::try_from(size) {
+            // guess type only if we have enough data to identify by magic number
+            Ok(size) if size >= *MAGIC_MAX_LEN => {
+                let mut buf = vec![0u8; *MAGIC_MAX_LEN];
 
-        input.seek(seek)?;
-        input.read_exact(&mut buf)?;
-        input.seek(seek)?;
+                let seek = SeekFrom::Start(0);
 
-        Ok(Self::guess_type(&buf))
+                input.seek(seek)?;
+                input.read_exact(&mut buf)?;
+                input.seek(seek)?;
+
+                Ok(Self::guess_type(&buf))
+            }
+            _ => {
+                // file doesn't have enough magic number data
+                Ok(None)
+            }
+        }
     }
 
     fn guess_type(input: &[u8]) -> Option<Self> {
