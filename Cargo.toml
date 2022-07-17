@@ -1,6 +1,6 @@
 [package]
 name = "seeneva"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Sergei Solodovnikov <sergei@isolo.me>"]
 license = "GPL-3.0-or-later"
 edition = "2018"
@@ -29,7 +29,7 @@ libc = "0.2"
 log = "0.4"
 num_cpus = "1.0"
 rayon = "1.5"
-ndarray = { version="0.15", features=["rayon"] }
+ndarray = { version = "0.15", features = ["rayon"] }
 num-traits = "0.2.14"
 itertools = "0.10"
 lopdf = "0.26.0"
